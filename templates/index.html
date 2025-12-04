@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Столбчатой диаграммы из фрейма данных</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div id="statusMessage">
+
+        </div>
+        <div class="header">
+            <h1>Генератор тестовых столбчатых диаграмм из фрейма данных</h1>
+        </div>
+
+        <div class="controls-container">
+
+            <div class="button-group">
+                <button class="control-btn primary" onclick="generateNewData()">
+                    Сгенерировать
+                </button>
+            </div>
+
+            <div class="controls-title">Выбор типа диаграммы</div>
+
+            <div class="chart-type-buttons">
+                <button class="type-btn active" onclick="changeChartType('grouped')">
+                    Группированная
+                </button>
+                <button class="type-btn" onclick="changeChartType('stacked')">
+                    Сложенная
+                </button>
+                <button class="type-btn" onclick="changeChartType('percentage')">
+                    В %
+                </button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>Загрузка данных...</p>
+        </div>
+
+        <div class="chart-container" id="chartContainer" style="display: none;">
+            <div id="chart"></div>
+        </div>
+
+        <div class="data-container" id="dataContainer" style="display: none;">
+            <div class="data-title">Иходный фрейм данных</div>
+            <div id="table-content"></div>
+        </div>
+
+        <div class="footer">
+            <p>Курсовая работа Жмурковой Анастасии группы ИСТ-31. Тема: Разработка столбчатой диаграммы из фрейма данных
+с помощью Plotly и Flask </p>
+        </div>
+    </div>
+
+    <script>
+        let currentChartType = 'grouped';
+        let currentData = null;
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function updateActiveButton(buttonType) {
+
+            document.querySelectorAll('.type-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+
+            document.querySelectorAll('.control-btn').forEach(btn => {
+                if (btn.textContent.includes('Группированная') && buttonType === 'grouped') {
+                    btn.classList.add('active');
+                } else if (btn.textContent.includes('Сложенная') && buttonType === 'stacked') {
+                    btn.classList.add('active');
+                } else if (btn.textContent.includes('Процентная') && buttonType === 'percentage') {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        function changeChartType(chartType) {
+            currentChartType = chartType;
+            updateActiveButton(chartType);
+
+            if (currentData) {
+                loadChart(chartType);
+            }
+        }
+
+        function generateNewData() {
+            showLoading(true);
+            document.getElementById('statusMessage').style.display = 'none';
+
+            fetch('/generate_data')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentData = data.data;
+                        document.getElementById('statusMessage').innerHTML =
+                            '✅ Данные успешно сгенерированы! Выберите тип диаграммы.';
+                        document.getElementById('statusMessage').style.display = 'block';
+
+                        // Загружаем диаграмму с текущим типом
+                        loadChart(currentChartType);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('statusMessage').innerHTML =
+                        '❌ Ошибка при генерации данных';
+                    document.getElementById('statusMessage').style.display = 'block';
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        function loadChart(chartType) {
+            showLoading(true);
+
+            fetch(`/get_chart/${chartType}`)
+                .then(response => response.json())
+                .then(data => {
+
+                    document.getElementById('chartContainer').style.display = 'block';
+                    document.getElementById('dataContainer').style.display = 'block';
+                    document.getElementById('statusMessage').style.display = 'none';
+
+
+                    const chartData = JSON.parse(data.graph_json);
+                    Plotly.newPlot('chart', chartData.data, chartData.layout, {responsive: true});
+
+
+                    document.getElementById('table-content').innerHTML = data.table_html;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('statusMessage').innerHTML =
+                        '❌ Ошибка при загрузке диаграммы';
+                    document.getElementById('statusMessage').style.display = 'block';
+                })
+                .finally(() => {
+                    showLoading(false);
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateActiveButton('grouped');
+        });
+    </script>
+</body>
+</html>
